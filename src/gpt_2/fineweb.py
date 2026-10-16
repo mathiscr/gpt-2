@@ -10,7 +10,7 @@ eot = enc.encode_single_token("<|endoftext|>")
 shard_size = int(1e8)
 local_dir = "edu_fineweb10B"
 remote_name = "sample-10BT"
-max_shards = 21  # approx 2B tokens
+max_shards = 100  # approx 10B tokens
 fw = datasets.load_dataset(
     "HuggingFaceFW/fineweb-edu", name=remote_name, split="train", streaming=True
 )
