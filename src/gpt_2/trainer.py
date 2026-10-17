@@ -137,7 +137,8 @@ class Trainer:
     def train_step(self, step):
         t0 = time.time()
         self.model.train()
-        self.optimizer.zero_grad()
+        for opt in self.optimizer:
+            opt.zero_grad(set_to_none=True)
         loss_accum = 0
         for micro_step in range(self.grad_accum_steps):
             x, y = next(self.train_loader)
@@ -160,9 +161,10 @@ class Trainer:
             self.model.parameters(), self.config.grad_clip
         )
         lr = self.config.get_lr(step)
-        for param_group in self.optimizer.param_groups:
-            param_group["lr"] = lr
-        self.optimizer.step()
+        for opt in self.optimizer:
+            for param_group in opt.param_groups:
+                param_group["lr"] = lr
+            opt.step()
         if self.info.device_type == "cuda":
             torch.cuda.synchronize()
         t1 = time.time()
@@ -229,7 +231,7 @@ class Trainer:
         torch.save(
             {
                 "model": self.base_model.state_dict(),
-                "optimizer": self.optimizer.state_dict(),
+                "optimizer": [opt.state_dict() for opt in self.optimizer],
                 "step": step,
                 "gpt_config": asdict(self.gpt_config),
             },

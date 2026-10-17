@@ -174,7 +174,19 @@ class GPT(nn.Module):
     def configure_optimizer(self, weight_decay, lr, device, master_process):
         param_dict = {n: p for n, p in self.named_parameters()}
         param_dict = {n: p for n, p in param_dict.items() if p.requires_grad}
-        decay_param = [p for _, p in param_dict.items() if p.dim() >= 2]
+        muon_dict = (
+            {
+                n: p
+                for n, p in param_dict.items()
+                if p.dim() == 2 and "wte" not in n and "wpe" not in n
+            }
+            if self.config.use_muon
+            else {}
+        )
+        decay_param = [
+            p for n, p in param_dict.items() if p.dim() >= 2 and n not in muon_dict
+        ]
+        muon_param = muon_dict.values()
         nodecay_param = [p for _, p in param_dict.items() if p.dim() < 2]
         optim_param = [
             {"params": decay_param, "weight_decay": weight_decay},
@@ -189,7 +201,15 @@ class GPT(nn.Module):
         use_fused = fused_available and "cuda" in device
         if master_process:
             print("using fused in AdamW", use_fused)
-        optimizer = torch.optim.AdamW(
+        optimizer_adamw = torch.optim.AdamW(
             optim_param, lr=lr, betas=(0.9, 0.95), eps=1e-8, fused=use_fused
         )
-        return optimizer
+        if self.config.use_muon:
+            optimizer_muon = torch.optim.Muon(
+                muon_param,
+                lr=lr,
+                weight_decay=weight_decay,
+                adjust_lr_fn="match_rms_adamw"
+            )
+            return [optimizer_adamw, optimizer_muon]
+        return [optimizer_adamw]

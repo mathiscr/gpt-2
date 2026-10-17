@@ -12,7 +12,7 @@ class GPTConfig:
     activation: str = "gelu" # gelu | relu2
     norm: str = "LayerNorm" # LayerNorm | RMSNorm
     use_rope: bool = False
-    optimizer: str = "adamw" # adamw | muon
+    use_muon: bool = False
 
 
 @dataclass
@@ -30,16 +30,16 @@ class TrainConfig:
     # sampler
     num_return_sequences: int = 5
     max_length: int = 30
-    sample_every: int = 250
-    prompt: str = "Hello, I'm an LLM"
+    sample_every: int = 10000
+    prompt: str = "Hello, I'm "
 
     # optimization
     max_lr: float = 6e-4
     min_lr_ratio: float = 0.1
-    warmup_steps: int = 50
-    max_steps: int = 954
+    warmup_steps: int = 100
+    max_steps: int = 1907
     weight_decay: float = 0.1
-    eval_every: int = 50
+    eval_every: int = 100
     grad_clip:float = 1.0
     eval_steps: int = 20
 
