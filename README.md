@@ -91,8 +91,8 @@ src/gpt-2/
 The project uses uv to handle the local environment.
 
 ```bash
-cd src/gpt-2
 uv sync
+cd src/gpt-2
 ```
 
 The project uses `wandb` and `weave` for experiment tracking. On the first run, W&B asks whether you want to log in or skip visualization.
@@ -109,9 +109,19 @@ The script streams the dataset, tokenizes it in parallel and writes shards of 10
 
 ### Training
 
+If you want to train without wandb, you can run this because the usage of wandb is set to False byy default in the config file (use_wandb=False).
+
 ```bash
 # baseline, 2 GPUs
 uv run torchrun --standalone --nproc_per_node=2 train.py
+```
+
+If you want to train with wandb, you can use the flag use_wandb but you'll have to insert your API key.
+
+
+```bash
+# baseline, 2 GPUs
+uv run torchrun --standalone --nproc_per_node=2 train.py --use_wandb
 ```
 
 Hyperparameters live in `config.py`, and any field can be overridden from the command line. For example, a 1B-token ablation (about 1,900 steps at 0.5M tokens per step):
