@@ -64,19 +64,20 @@ class Trainer:
         )
 
         if info.master_process:
-            wandb.init(
-                project=config.project,
-                name=config.name,
-                group=config.group,
-                config={
-                    **asdict(gpt_config),
-                    **asdict(config),
-                    "min_lr": config.min_lr,
-                    "grad_accum_steps": self.grad_accum_steps,
-                    "world_size": info.ddp_world_size,
-                },
-            )
-            weave.init(config.project)
+            if self.config.use_wandb:
+                wandb.init(
+                    project=config.project,
+                    name=config.name,
+                    group=config.group,
+                    config={
+                        **asdict(gpt_config),
+                        **asdict(config),
+                        "min_lr": config.min_lr,
+                        "grad_accum_steps": self.grad_accum_steps,
+                        "world_size": info.ddp_world_size,
+                    },
+                )
+                weave.init(config.project)
 
             @weave.op()
             def generate_samples(
@@ -107,7 +108,7 @@ class Trainer:
     @torch.no_grad()
     def evaluate(self, step):
         self.model.eval()
-        val_loss_acum = 0
+        val_loss_acum = torch.zeros((), device=self.info.device)
         val_loss_steps = self.config.eval_steps
         for x, y in islice(self.val_loader, val_loss_steps):
             x, y = x.to(self.info.device), y.to(self.info.device)
@@ -115,14 +116,15 @@ class Trainer:
                 device_type=self.info.device_type,
                 dtype=torch.bfloat16,
             ):
-                logits, loss = self.model(x, y)
+                pred, loss = self.model(x, y)
             loss = loss / val_loss_steps
             val_loss_acum += loss.detach()
         if self.info.ddp:
             dist.all_reduce(val_loss_acum, op=dist.ReduceOp.AVG)
         if self.info.master_process:
             print(f"validation loss: {val_loss_acum.item():.4f}")
-            wandb.log({"val/loss": val_loss_acum.item()}, step=step)
+            if self.config.use_wandb:
+                wandb.log({"val/loss": val_loss_acum.item()}, step=step)
 
     def sample(self, step):
         samples = self.generate_samples(
@@ -180,16 +182,17 @@ class Trainer:
             print(
                 f"step {step:4d} | loss {loss_accum.item():.6f} | lr {lr:.4e} | norm {norm:.4f}  | dt {dt:.2f} ms, tok/s {tokens_per_sec:.2f}"
             )
-            wandb.log(
-                {
-                    "train/loss": loss_accum.item(),
-                    "train/lr": lr,
-                    "train/grad_norm": norm.item(),
-                    "train/tokens_per_sec": tokens_per_sec,
-                    "train/dt_ms": dt,
-                },
-                step=step,
-            )
+            if self.config.use_wandb:
+                wandb.log(
+                    {
+                        "train/loss": loss_accum.item(),
+                        "train/lr": lr,
+                        "train/grad_norm": norm.item(),
+                        "train/tokens_per_sec": tokens_per_sec,
+                        "train/dt_ms": dt,
+                    },
+                    step=step,
+                )
 
     def fit(self):
         for step in range(self.config.max_steps):
@@ -218,7 +221,8 @@ class Trainer:
                 f"gpt2_model_weights_{self.config.name}.pt",
             )
             print("weights saved")
-            wandb.finish()
+            if self.config.use_wandb:
+                wandb.finish()
 
     def save_checkpoint(self, step):
         if not self.info.master_process:

@@ -51,6 +51,7 @@ class TrainConfig:
     project: str = "gpt2-from-scratch"
     name: str = "baseline-500M"
     group: str = "500Mtokens"
+    use_wandb: bool = False
     seed: int = 42
 
     @property
